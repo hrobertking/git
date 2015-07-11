@@ -1,0 +1,91 @@
+[user]
+  name = Robert King
+  email = h.robert.king@mailinator.com
+[push]
+  default = matching
+[alias]
+  # makes a branch using a parent branch, e.g., git mkbranch issue-999 release-0.0.1
+  # assumes remotes named 'upstream' and 'origin'
+  mkbranch = "!f() {                                                            \
+      if [[ -z $1 ]]; then                                                      \
+        echo \"Branch name is missing\";                                        \
+        exit -1;                                                                \
+      elif [[ -z $2 ]]; then                                                    \
+        echo \"Parent branch is missing\";                                      \
+        exit -1;                                                                \
+      else                                                                      \
+        read -r -p \"Create $1 as child of upstream/$2? [y|N] \" response;      \
+        if [[ $response =~ ^[yY] ]]; then                                       \
+          git checkout -b $1 upstream/$2;                                       \
+          git pull;                                                             \
+          git push origin $1;                                                   \
+        else                                                                    \
+          echo \"Aborting\";                                                    \
+        fi;                                                                     \
+      fi;                                                                       \
+    };f"
+
+  # moves a branch, e.g., git mvbranch old-branch-name new-branch-name
+  # assumes a remote named 'origin'
+  mvbranch = "!f() {                                                            \
+      if [[ -z $1 ]]; then                                                      \
+        echo \"Branch name is missing\";                                        \
+        exit -1;                                                                \
+      elif [[ -z $2 ]]; then                                                    \
+        echo \"New branch name is missing\";                                    \
+        exit -1;                                                                \
+      else                                                                      \
+        read -r -p \"Rename $1 to $2? [y|N] \" response;                        \
+        if [[ $response =~ ^[yY] ]]; then                                       \
+          git branch -m $1 $2;                                                  \
+          read -r -p \"Rename remote $1 to $2? [y|N] \" remote_response;        \
+          if [[ $remote_response =~ ^[yY] ]]; then                              \
+            git push origin :$1;                                                \
+          fi;                                                                   \
+          git push --set-upstream origin $2;                                    \
+        else                                                                    \
+          echo \"Aborting\";                                                    \
+        fi;                                                                     \
+      fi;                                                                       \
+    };f"
+
+  # removes a branch, e.g., git rmbranch issue-999
+  # assumes a remote named 'origin' and a 'master' branch
+  rmbranch = "!f() {                                                            \
+      if [[ -z $1 ]]; then                                                      \
+        echo \"Branch name is missing\";                                        \
+        exit -1;                                                                \
+      else                                                                      \
+        read -r -p \"Deleting $1. Are you sure? [y|N] \" response;              \
+        if [[ $response =~ ^[yY] ]]; then                                       \
+          git checkout master;                                                  \
+          git branch -D $1;                                                     \
+        fi;                                                                     \
+        read -r -p \"Delete the remote branch? [y|N] \" response;               \
+        if [[ $response =~ ^[yY] ]]; then                                       \
+          git push origin :$1;                                                  \
+        fi;                                                                     \
+      fi;                                                                       \
+    };f"
+
+  # unapplies a stash, e.g., git unapply or git unapply 3
+  # if no stash index is specified, the last stash is 'unapplied'
+  unapply = "!f() {                                                             \
+      if [[ -z $1 ]]; then                                                      \
+        git stash show -p | git apply -R;                                       \
+      else                                                                      \
+        git stash show -p stash@{$1} | git apply -R;                            \
+      fi;                                                                       \
+    };f"
+
+  # applies work previously stashed, e.g. git unstash or git unstash 3
+  # if no stash index is specified, the last stash is applied and dropped
+  unstash = "!f() {                                                             \
+      if [[ -z $1 ]]; then                                                      \
+        git stash apply;                                                        \
+        git stash drop;                                                         \
+      else                                                                      \
+        git stash apply stash@{$1};                                             \
+        git stash drop stash@{$1};                                              \
+      fi;                                                                       \
+    };f"
