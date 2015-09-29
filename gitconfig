@@ -4,6 +4,27 @@
 [push]
   default = matching
 [alias]
+  # displays changes in a branch, e.g. git authored or git author "author name"
+  authored = "!f() {                                                            \
+      if [[ -z $1 ]]; then                                                      \
+        author=\"$(git config user.name)\";                                     \
+      else                                                                      \
+        author=\"$1\";                                                          \
+      fi;                                                                       \
+      author=\"${author// /\\s}\";                                              \
+      gitlog=\"$(git log --pretty='%H' --author=$author)\";                     \
+      changed=();                                                               \
+      commits=(${gitlog//$'\n'/ });                                             \
+      for commit_key in \"${commits[@]}\";                                      \
+        do files=\"$(git show --oneline --name-only $commit_key | tail -n+2)\"; \
+        changed+=(${files});                                                    \
+      done;                                                                     \
+      files=();                                                                 \
+      files=\"$(echo ${changed[@]}|tr \" \" \"\n\"|sort|uniq)\";                \
+      echo \"${files[@]}\";                                                     \
+      echo \"\";                                                                \
+  };f"
+
   # makes a branch using a parent branch, e.g., git mkbranch issue-999 release-0.0.1
   # assumes remotes named 'upstream' and 'origin'
   mkbranch = "!f() {                                                            \
@@ -68,6 +89,39 @@
       fi;                                                                       \
     };f"
 
+  # rolls back changes to the specified commit and optionally does a force commit
+  # e.g., git rollback 12345abcde
+  rollback = "!f() {                                                            \
+      if [[ $# -lt 1 ]]; then                                                   \
+        echo \"\";                                                              \
+        echo \"Rolls back a branch to the specified commit\";                   \
+        echo \"\";                                                              \
+        echo \"Usage: git rollback <commit-id> [<repo>]\";                      \
+        echo \"Example: git rollback 24c51ade98e4f9cce2771b29a9a15973de308e53\";\
+        echo \"\";                                                              \
+        exit -1;                                                                \
+      else                                                                      \
+        if [[ -z $2 ]]; then                                                    \
+          r=\"origin\";                                                         \
+        else                                                                    \
+          r=\"$2\";                                                             \
+        fi;                                                                     \
+        read -r -p \"Rolling back to $1. Are you sure? [y|N] \" response;       \
+        if [[ $response =~ ^[yY] ]]; then                                       \
+          git reset --hard $1;                                                  \
+          echo \"!! THIS WILL DO A FORCE PUSH TO $r. YOU MUST CONFIRM. !!\";    \
+          read -r -p \"!! Confirm force push !! [y|N] \" ok;                    \
+          if [[ $ok =~ ^[yY] ]]; then                                           \
+            git push $r HEAD --force;                                           \
+          else                                                                  \
+            echo \"Aborting\";                                                  \
+          fi;                                                                   \
+        else                                                                    \
+          echo \"Aborting\";                                                    \
+        fi;                                                                     \
+      fi;                                                                       \
+    };f"
+
   # unapplies a stash, e.g., git unapply or git unapply 3
   # if no stash index is specified, the last stash is 'unapplied'
   unapply = "!f() {                                                             \
@@ -87,5 +141,58 @@
       else                                                                      \
         git stash apply stash@{$1};                                             \
         git stash drop stash@{$1};                                              \
+      fi;                                                                       \
+    };f"
+
+  # switches branches given a partial branch name, includes stashing current work
+  # e.g., git workon 999
+  workon = "!f() {                                                              \
+      if [[ $# -lt 1 ]]; then                                                   \
+        echo \"\";                                                              \
+        echo \"Switches branches\";                                             \
+        echo \"\";                                                              \
+        echo \"Usage: git workon <defect>\";                                    \
+        echo \"Example: git workon Issue-9999\";                                \
+        echo \"\";                                                              \
+        exit -1;                                                                \
+      else                                                                      \
+        branch_name=\"\";                                                       \
+        branches=\"$(git branch)\";                                             \
+        branches=(${branches//$'\n'/ });                                        \
+        for branch in \"${branches[@]}\";                                       \
+          do if [[ $branch =~ $1 ]]; then                                       \
+            branch_name=\"$branch\";                                            \
+          fi;                                                                   \
+        done;                                                                   \
+        if [[ -z $branch_name ]]; then                                          \
+          echo \"\";                                                            \
+          echo \"Unable to find a matching branch.\";                           \
+          echo \"\";                                                            \
+          exit -1;                                                              \
+        else                                                                    \
+          unstaged=\"$(git status | grep 'Changes not staged for commit')\";    \
+          if [[ -n $unstaged ]]; then                                           \
+            echo \"\";                                                          \
+            echo \"Staged changes can be stashed; unstaged changes cannot.\";   \
+            echo \"You have unstaged changes that must be resolved.\";          \
+            echo \"\";                                                          \
+            exit -1;                                                            \
+          fi;                                                                   \
+          do_stash=\"$(git status | grep 'Changes to be committed')\";          \
+          if [[ -n $do_stash ]]; then                                           \
+            git stash save;                                                     \
+            echo \"Changes stashed.\";                                          \
+          fi;                                                                   \
+          git checkout $branch_name;                                            \
+          stashes=\"$(git stash list | grep $branch_name)\";                    \
+          if [[ $stashes =~ stash@\\{([0-9]+)\\} ]]; then                       \
+            stashes=\"${BASH_REMATCH[1]}\";                                     \
+          else                                                                  \
+            stashes=\"\";                                                       \
+          fi;                                                                   \
+          if [[ -n $stashes ]]; then                                            \
+            git unstash $stashes;                                               \
+          fi;                                                                   \
+        fi;                                                                     \
       fi;                                                                       \
     };f"
