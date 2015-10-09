@@ -25,6 +25,41 @@
       echo \"\";                                                                \
   };f"
 
+  # shows the date and time the specified branch was created in ISO format
+  # if no branch is specified, all branches are listed in alphabetical order
+  created = "!f() {                                                             \
+      shopt -s nocasematch;                                                     \
+      listing=\"$(git branch|sed s/^..//|sort)\";                               \
+      branches=(${listing//$'\n'/ });                                           \
+      summary=();                                                               \
+      for k in \"${branches[@]}\";                                              \
+         do verb=\"$(git log -1 --pretty=format:'%Cgreen%ci %Creset' $k)\";     \
+         summary+=(\"${verb}  $k\");                                            \
+      done;                                                                     \
+       for k in \"${summary[@]}\";                                              \
+          do if [[ $k =~ $1 || -z $1 ]]; then                                   \
+             echo $k;                                                           \
+          fi;                                                                   \
+       done;                                                                    \
+  };f"
+
+  # identifies files modified in the specified commit
+  delta = "!f() {                                                               \
+      if [[ $# -lt 1 ]]; then                                                   \
+        echo \"\";                                                              \
+        echo \"Identifies files changed in the specified commit\";              \
+        echo \"\";                                                              \
+        echo \"Usage: git delta <commit-id>\";                                  \
+        echo \"Example: git delta 123abc\";                                     \
+        echo \"\";                                                              \
+        exit -1;                                                                \
+      else                                                                      \
+        echo \"\";                                                              \
+        git show --pretty="format:" --name-only $1;                             \
+        echo \"\";                                                              \
+      fi;                                                                       \
+  };f"
+
   # makes a branch using a parent branch, e.g., git mkbranch issue-999 release-0.0.1
   # assumes remotes named 'upstream' and 'origin'
   mkbranch = "!f() {                                                            \
