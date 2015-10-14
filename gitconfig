@@ -27,20 +27,54 @@
 
   # shows the date and time the specified branch was created in ISO format
   # if no branch is specified, all branches are listed in alphabetical order
+  # unless the --by-date argument is passed, sorting branches in create-date
+  # order
   created = "!f() {                                                             \
       shopt -s nocasematch;                                                     \
       listing=\"$(git branch|sed s/^..//|sort)\";                               \
       branches=(${listing//$'\n'/ });                                           \
-      summary=();                                                               \
+      unsorted=();                                                              \
       for k in \"${branches[@]}\";                                              \
-         do verb=\"$(git log -1 --pretty=format:'%Cgreen%ci %Creset' $k)\";     \
-         summary+=(\"${verb}  $k\");                                            \
+        do verb=\"$(git log -1 --pretty=format:'%Cgreen%ci %Creset' $k)\";      \
+        unsorted+=(\"${verb}  $k\");                                            \
       done;                                                                     \
-       for k in \"${summary[@]}\";                                              \
-          do if [[ $k =~ $1 || -z $1 ]]; then                                   \
-             echo $k;                                                           \
+      sorted=();                                                                \
+      for k in \"${unsorted[@]}\";                                              \
+        do smaller=();                                                          \
+        larger=();                                                              \
+        for el in \"${sorted[@]}\";                                             \
+          do if [[ $el < $k ]]; then                                            \
+            smaller+=(\"$el\");                                                 \
+          else                                                                  \
+            larger+=(\"$el\");                                                  \
           fi;                                                                   \
-       done;                                                                    \
+        done;                                                                   \
+        sorted=();                                                              \
+        sorted+=(\"${smaller[@]}\");                                            \
+        sorted+=(\"$k\");                                                       \
+        sorted+=(\"${larger[@]}\");                                             \
+      done;                                                                     \
+      by_date=0;                                                                \
+      for k in \"$@\";                                                          \
+        do if [[ $k =~ \\-by\\-date ]]; then                                    \
+          by_date=1;                                                            \
+        else                                                                    \
+          branch=\"$k\";                                                        \
+        fi;                                                                     \
+      done;                                                                     \    
+      if [[ by_date -eq 1 ]]; then                                              \
+        for k in \"${sorted[@]}\";                                              \
+          do if [[ $k =~ $branch || -z $branch ]]; then                         \
+            echo $k;                                                            \
+          fi;                                                                   \
+        done;                                                                   \
+      else                                                                      \  
+        for k in \"${unsorted[@]}\";                                            \
+          do if [[ $k =~ $branch || -z $branch ]]; then                         \
+            echo $k;                                                            \
+          fi;                                                                   \
+        done;                                                                   \
+      fi;                                                                       \
   };f"
 
   # identifies files modified in the specified commit
