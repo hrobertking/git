@@ -4,295 +4,453 @@
 [push]
   default = matching
 [alias]
-  # displays changes in a branch, e.g. git authored or git author "author name"
-  authored = "!f() {                                                            \
-      if [[ -z $1 ]]; then                                                      \
-        author=\"$(git config user.name)\";                                     \
-      else                                                                      \
-        author=\"$1\";                                                          \
-      fi;                                                                       \
-      author=\"${author// /\\s}\";                                              \
-      gitlog=\"$(git log --pretty='%H' --author=$author)\";                     \
-      changed=();                                                               \
-      commits=(${gitlog//$'\n'/ });                                             \
-      for commit_key in \"${commits[@]}\";                                      \
-        do files=\"$(git show --oneline --name-only $commit_key | tail -n+2)\"; \
-        changed+=(${files});                                                    \
-      done;                                                                     \
-      files=();                                                                 \
-      files=\"$(echo ${changed[@]}|tr \" \" \"\n\"|sort|uniq)\";                \
-      echo \"${files[@]}\";                                                     \
-      echo \"\";                                                                \
-  };f"
+  # displays changes in a branch
+  #
+  # Usage: git authored <commit> [<author>]
+  # Example: git authored 
+  #          git author 977de
+  #          git author 977de "Robert King"
+  authored = "!f() {                                                              \
+      commit_id=\"$1\";                                                           \
+      if [[ -z $2 ]]; then                                                        \
+        author=\"$(git config user.name)\";                                       \
+      else                                                                        \
+        author=\"$1\";                                                            \
+      fi;                                                                         \
+      author=\"${author// /\\s}\";                                                \
+      if [[ -z $commit_id ]]; then                                                \
+        gitlog=\"$(git log --pretty='%H' --author=$author)\";                     \
+      else                                                                        \
+        gitlog=\"$(git log --pretty='%H' --author=$author | grep $commit_id)\";   \
+      fi;                                                                         \
+      changed=();                                                                 \
+      commits=(${gitlog//$'\n'/ });                                               \
+      for commit_key in \"${commits[@]}\";                                        \
+        do files=\"$(git show --oneline --name-only $commit_key | tail -n+2)\";   \
+        changed+=(${files});                                                      \
+      done;                                                                       \
+      files=();                                                                   \
+      files=\"$(echo ${changed[@]}|tr \" \" \"\n\"|sort|uniq)\";                  \
+      echo \"${files[@]}\";                                                       \
+      echo \"\";                                                                  \
+    };f"
 
   # shows the date and time the specified branch was created in ISO format
   # if no branch is specified, all branches are listed in alphabetical order
   # unless the --by-date argument is passed, sorting branches in create-date
   # order
-  created = "!f() {                                                             \
-      shopt -s nocasematch;                                                     \
-      listing=\"$(git branch|sed s/^..//|sort)\";                               \
-      branches=(${listing//$'\n'/ });                                           \
-      unsorted=();                                                              \
-      for k in \"${branches[@]}\";                                              \
-        do verb=\"$(git log -1 --pretty=format:'%Cgreen%ci %Creset' $k)\";      \
-        unsorted+=(\"${verb}  $k\");                                            \
-      done;                                                                     \
-      sorted=();                                                                \
-      for k in \"${unsorted[@]}\";                                              \
-        do smaller=();                                                          \
-        larger=();                                                              \
-        for el in \"${sorted[@]}\";                                             \
-          do if [[ $el < $k ]]; then                                            \
-            smaller+=(\"$el\");                                                 \
-          else                                                                  \
-            larger+=(\"$el\");                                                  \
-          fi;                                                                   \
-        done;                                                                   \
-        sorted=();                                                              \
-        sorted+=(\"${smaller[@]}\");                                            \
-        sorted+=(\"$k\");                                                       \
-        sorted+=(\"${larger[@]}\");                                             \
-      done;                                                                     \
-      by_date=0;                                                                \
-      for k in \"$@\";                                                          \
-        do if [[ $k =~ \\-by\\-date ]]; then                                    \
-          by_date=1;                                                            \
-        else                                                                    \
-          branch=\"$k\";                                                        \
-        fi;                                                                     \
-      done;                                                                     \    
-      if [[ by_date -eq 1 ]]; then                                              \
-        for k in \"${sorted[@]}\";                                              \
-          do if [[ $k =~ $branch || -z $branch ]]; then                         \
-            echo $k;                                                            \
-          fi;                                                                   \
-        done;                                                                   \
-      else                                                                      \  
-        for k in \"${unsorted[@]}\";                                            \
-          do if [[ $k =~ $branch || -z $branch ]]; then                         \
-            echo $k;                                                            \
-          fi;                                                                   \
-        done;                                                                   \
-      fi;                                                                       \
-  };f"
+  #
+  # Usage: git created [--by-date] <branch>
+  # Example: git created
+  #          git created issue-999
+  #          git created --by-date
+  created = "!f() {                                                               \
+      shopt -s nocasematch;                                                       \
+      listing=\"$(git branch|sed s/^..//|sort)\";                                 \
+      branches=(${listing//$'\n'/ });                                             \
+      unsorted=();                                                                \
+      for k in \"${branches[@]}\";                                                \
+        do verb=\"$(git log -1 --pretty=format:'%Cgreen%ci %Creset' $k)\";        \
+        unsorted+=(\"${verb}  $k\");                                              \
+      done;                                                                       \
+      sorted=();                                                                  \
+      for k in \"${unsorted[@]}\";                                                \
+        do smaller=();                                                            \
+        larger=();                                                                \
+        for el in \"${sorted[@]}\";                                               \
+          do if [[ $el < $k ]]; then                                              \
+            smaller+=(\"$el\");                                                   \
+          else                                                                    \
+            larger+=(\"$el\");                                                    \
+          fi;                                                                     \
+        done;                                                                     \
+        sorted=();                                                                \
+        sorted+=(\"${smaller[@]}\");                                              \
+        sorted+=(\"$k\");                                                         \
+        sorted+=(\"${larger[@]}\");                                               \
+      done;                                                                       \
+      by_date=0;                                                                  \
+      for k in \"$@\";                                                            \
+        do if [[ $k =~ \\-by\\-date ]]; then                                      \
+          by_date=1;                                                              \
+        else                                                                      \
+          branch=\"$k\";                                                          \
+        fi;                                                                       \
+      done;                                                                       \
+      if [[ by_date -eq 1 ]]; then                                                \
+        for k in \"${sorted[@]}\";                                                \
+          do if [[ $k =~ $branch || -z $branch ]]; then                           \
+            echo $k;                                                              \
+          fi;                                                                     \
+        done;                                                                     \
+      else                                                                        \
+        for k in \"${unsorted[@]}\";                                              \
+          do if [[ $k =~ $branch || -z $branch ]]; then                           \
+            echo $k;                                                              \
+          fi;                                                                     \
+        done;                                                                     \
+      fi;                                                                         \
+    };f"
 
   # identifies files modified in the specified commit
-  delta = "!f() {                                                               \
-      if [[ $# -lt 1 ]]; then                                                   \
-        echo \"\";                                                              \
-        echo \"Identifies files changed in the specified commit\";              \
-        echo \"\";                                                              \
-        echo \"Usage: git delta <commit-id>\";                                  \
-        echo \"Example: git delta 123abc\";                                     \
-        echo \"\";                                                              \
-        exit -1;                                                                \
-      else                                                                      \
-        echo \"\";                                                              \
-        git show --pretty="format:" --name-only $1;                             \
-        echo \"\";                                                              \
-      fi;                                                                       \
-  };f"
-
-  # makes a branch using a parent branch, e.g., git mkbranch issue-999 release-0.0.1
-  # assumes remotes named 'upstream' and 'origin'
-  mkbranch = "!f() {                                                            \
-      if [[ -z $1 ]]; then                                                      \
-        echo \"Branch name is missing\";                                        \
-        exit -1;                                                                \
-      elif [[ -z $2 ]]; then                                                    \
-        echo \"Parent branch is missing\";                                      \
-        exit -1;                                                                \
-      else                                                                      \
-        read -r -p \"Create $1 as child of upstream/$2? [y|N] \" response;      \
-        if [[ $response =~ ^[yY] ]]; then                                       \
-          git checkout -b $1 upstream/$2;                                       \
-          git pull;                                                             \
-          git push origin $1;                                                   \
-        else                                                                    \
-          echo \"Aborting\";                                                    \
-        fi;                                                                     \
-      fi;                                                                       \
+  #
+  # Usage: git delta <commit>
+  # Example: git delta 977de
+  delta = "!f() {                                                                 \
+      if [[ $# -lt 1 ]]; then                                                     \
+        echo \"\";                                                                \
+        echo \"Identifies files changed in the specified commit\";                \
+        echo \"\";                                                                \
+        echo \"Usage: git delta <commit-id>\";                                    \
+        echo \"Example: git delta 123abc\";                                       \
+        echo \"\";                                                                \
+        exit -1;                                                                  \
+      else                                                                        \
+        echo \"\";                                                                \
+        git show --pretty="format:" --name-only $1;                               \
+        echo \"\";                                                                \
+      fi;                                                                         \
     };f"
 
-  # moves a branch, e.g., git mvbranch old-branch-name new-branch-name
-  # assumes a remote named 'origin'
-  mvbranch = "!f() {                                                            \
-      if [[ -z $1 ]]; then                                                      \
-        echo \"Branch name is missing\";                                        \
-        exit -1;                                                                \
-      elif [[ -z $2 ]]; then                                                    \
-        echo \"New branch name is missing\";                                    \
-        exit -1;                                                                \
-      else                                                                      \
-        read -r -p \"Rename $1 to $2? [y|N] \" response;                        \
-        if [[ $response =~ ^[yY] ]]; then                                       \
-          git branch -m $1 $2;                                                  \
-          read -r -p \"Rename remote $1 to $2? [y|N] \" remote_response;        \
-          if [[ $remote_response =~ ^[yY] ]]; then                              \
-            git push origin :$1;                                                \
-          fi;                                                                   \
-          git push --set-upstream origin $2;                                    \
-        else                                                                    \
-          echo \"Aborting\";                                                    \
-        fi;                                                                     \
-      fi;                                                                       \
+  # identifies whether or not the branch is in the remote repo
+  #
+  # Usage: git isremote <branch>
+  # Example: git isremote issue-999
+  isremote = "!f() {                                                              \
+      if [[ $# -lt 1 ]]; then                                                     \
+        echo \"\";                                                                \
+        echo \"Identifies whether or not the branch is in the remote repo\";      \
+        echo \"\";                                                                \
+        echo \"Usage: git isremote <branch> [<repo>]\";                           \
+        echo \"Example: git isremote issue-branch-1 development\";                \
+        echo \"\";                                                                \
+        exit -1;                                                                  \
+      else                                                                        \
+        if [[ -z $2 ]]; then                                                      \
+          r=\"origin\";                                                           \
+        else                                                                      \
+          r=\"$2\";                                                               \
+        fi;                                                                       \
+        b=\"$(git branch r | grep $r/$1 | sed 's/^ *//g' | sed 's/ *$//g')\";     \
+        if [[ -z $b ]]; then                                                      \
+          echo \"$1 is not in the remote repo '$r'\";                             \
+        else                                                                      \
+          echo \"$1 is in the remote repo ($b)\";                                 \
+        fi;                                                                       \
+      fi;                                                                         \
     };f"
 
-  # removes a branch, e.g., git rmbranch issue-999
-  # assumes a remote named 'origin' and a 'master' branch
-  rmbranch = "!f() {                                                            \
-      if [[ -z $1 ]]; then                                                      \
-        echo \"Branch name is missing\";                                        \
-        exit -1;                                                                \
-      else                                                                      \
-        read -r -p \"Deleting $1. Are you sure? [y|N] \" response;              \
-        if [[ $response =~ ^[yY] ]]; then                                       \
-          git checkout master;                                                  \
-          git branch -D $1;                                                     \
-        fi;                                                                     \
-        read -r -p \"Delete the remote branch? [y|N] \" response;               \
-        if [[ $response =~ ^[yY] ]]; then                                       \
-          git push origin :$1;                                                  \
-        fi;                                                                     \
-      fi;                                                                       \
+  # makes a branch using a parent branch assuming remotes named 'upstream'
+  # and 'origin'
+  #
+  # Usage: git mkbranch <branch> <parent> [<upstream>] [<remote>]
+  # Example: git mkbranch issue-999 release-0.0.1
+  #          git mkbranch issue-999 release-0.0.1 bugfix
+  mkbranch = "!f() {                                                              \
+      if [[ -z $1 ]]; then                                                        \
+        echo \"Branch name is missing\";                                          \
+        exit -1;                                                                  \
+      elif [[ -z $2 ]]; then                                                      \
+        echo \"Parent branch is missing\";                                        \
+        exit -1;                                                                  \
+      else                                                                        \
+        b=\"$1\";                                                                 \
+        p=\"$2\";                                                                 \
+        if [[ -z $3 ]]; then                                                      \
+          u=\"upstream\";                                                         \
+        else                                                                      \
+          u=\"$3\";                                                               \
+        fi;                                                                       \
+        if [[ -z $4 ]]; then                                                      \
+          r=\"origin\";                                                           \
+        else                                                                      \
+          r=\"$4\";                                                               \
+        fi;                                                                       \
+        read -r -p \"Create $b as child of $u/$p? [y|N] \" response;              \
+        if [[ $response =~ ^[yY] ]]; then                                         \
+          git checkout -b $b $u/$p;                                               \
+          if [[ $? == 0 ]]; then                                                  \
+            git pull;                                                             \
+            if ! [[ $r =~ ^local ]]; then                                         \
+              git push $r $b;                                                     \
+            fi;                                                                   \
+          else                                                                    \
+            exit -1;                                                              \
+          fi;                                                                     \
+        else                                                                      \
+          echo \"Aborting\";                                                      \
+        fi;                                                                       \
+      fi;                                                                         \
+    };f"
+
+  # moves/renames a branch
+  #
+  # Usage: git mvbranch <from-branch> <to-branch> [<remote>]
+  # Example git mvbranch 
+  mvbranch = "!f() {                                                              \
+      if [[ $# -lt 2 ]]; then                                                     \
+        echo \"Usage: git mvbranch <from-branch> <to-branch> [<remote>]\";        \
+        exit -1;                                                                  \
+      else                                                                        \
+        bn=\"\";                                                                  \
+        branches=\"$(git branch)\";                                               \
+        branches=\$({branches//$'\n'/ });                                         \
+        for branch in \"${branches[@]}\";                                         \
+          do if [[ $branch =~ $1 ]]; then                                         \
+            bn=\"$branch\";                                                       \
+          fi;                                                                     \
+        done;                                                                     \
+        if [[ -z $bn ]]; then                                                     \
+          echo \"\";                                                              \
+          echo \"Unable to find a matching branch\";                              \
+          echo \"\";                                                              \
+          exit -1;                                                                \
+        fi;                                                                       \
+        nb=\"$2\";                                                                \
+        if [[ -z $3 ]]; then                                                      \
+          r=\"origin\";                                                           \
+        else                                                                      \
+          r=\"$3\";                                                               \
+        fi;                                                                       \
+        read -r -p \"Rename $bn to $nb? [y|N] \" response;                        \
+        if [[ $response =~ ^[yY] ]]; then                                         \
+          b=\"$(git branch -r | grep $r/$bn | sed 's/^ *//g' | sed 's/ *$//g')\"; \
+          git branch -m $bn $nb;                                                  \
+          if ! [[ -z $b ]]; then                                                  \
+            read -r -p \"Rename remote $bn to $nb? [y|N] \" remote_response;      \
+            if [[ $remote_response =~ ^[yY] ]]; then                              \
+              git push $r :$bn;                                                   \
+            fi;                                                                   \
+          fi;                                                                     \
+          git push --set-upstream $r $nb;                                         \
+        else                                                                      \
+          echo \"Aborting\";                                                      \
+        fi;                                                                       \
+      fi;                                                                         \
+    };f"
+
+  # removes a branch
+  #
+  # Usage: git rmbranch <branch>
+  # Example: git rmbranch issue-999
+  rmbranch = "!f() {                                                              \
+      if [[ -z $1 ]]; then                                                        \
+        echo \"Branch name is missing\";                                          \
+        exit -1;                                                                  \
+      else                                                                        \
+        bn=\"\";                                                                  \
+        branches=\"$(git branch)\";                                               \
+        branches=\$({branches//$'\n'/ });                                         \
+        for branch in \"${branches[@]}\";                                         \
+          do if [[ $branch =~ $1 ]]; then                                         \
+            bn=\"$branch\";                                                       \
+          fi;                                                                     \
+        done;                                                                     \
+        if [[ -z $bn ]]; then                                                     \
+          echo \"\";                                                              \
+          echo \"Unable to find a matching branch\";                              \
+          echo \"\";                                                              \
+          exit -1;                                                                \
+        fi;                                                                       \
+        if [[ -z $2 ]]; then                                                      \
+          r=\"origin\";                                                           \
+        else                                                                      \
+          r=\"$2\";                                                               \
+        fi;                                                                       \
+        read -r -p \"Deleting $bn. Are you sure? [y|N] \" response;               \
+        if [[ $response =~ ^[yY] ]]; then                                         \
+          git checkout $bn;                                                       \
+          if [[ $? != 0 ]]; then exit -1; fi;                                     \
+          git reset --hard;                                                       \
+          if [[ $? != 0 ]]; then exit -1; fi;                                     \
+          git checkout master;                                                    \
+          if [[ $? != 0 ]]; then exit -1; fi;                                     \
+          git branch -D $bn;                                                      \
+        fi;                                                                       \
+        b=\"$(git branch -r | grep $r/$bn | sed 's/^ *//g' | sed 's/ *$//g')\";   \
+        if ! [[ -z $b ]]; then                                                    \
+          read -r -p \"Delete the remote branch? [y|N] \" response;               \
+          if [[ $response =~ ^[yY] ]]; then                                       \
+            git push $r :$bn;                                                     \
+          fi;                                                                     \
+        fi;                                                                       \
+      fi;                                                                         \
     };f"
 
   # rolls back changes to the specified commit and optionally does a force push
-  # e.g., git rollback 12345abcde
-  rollback = "!f() {                                                            \
-      if [[ $# -lt 1 ]]; then                                                   \
-        echo \"\";                                                              \
-        echo \"Rolls back a branch to the specified commit\";                   \
-        echo \"\";                                                              \
-        echo \"Usage: git rollback <commit-id> [<repo>]\";                      \
-        echo \"Example: git rollback 24c51ade98e4f9cce2771b29a9a15973de308e53\";\
-        echo \"\";                                                              \
-        exit -1;                                                                \
-      else                                                                      \
-        if [[ -z $2 ]]; then                                                    \
-          r=\"origin\";                                                         \
-        else                                                                    \
-          r=\"$2\";                                                             \
-        fi;                                                                     \
-        read -r -p \"Rolling back to $1. Are you sure? [y|N] \" response;       \
-        if [[ $response =~ ^[yY] ]]; then                                       \
-          git reset --hard $1;                                                  \
-          echo \"!! THIS WILL DO A FORCE PUSH TO $r. YOU MUST CONFIRM. !!\";    \
-          read -r -p \"!! Confirm force push !! [y|N] \" ok;                    \
-          if [[ $ok =~ ^[yY] ]]; then                                           \
-            git push $r HEAD --force;                                           \
-          else                                                                  \
-            echo \"Aborting\";                                                  \
-          fi;                                                                   \
-        else                                                                    \
-          echo \"Aborting\";                                                    \
-        fi;                                                                     \
-      fi;                                                                       \
+  #
+  # Usage: git rollback <commit>
+  # Example: git rollback 977de
+  rollback = "!f() {                                                              \
+      if [[ $# -lt 1 ]]; then                                                     \
+        echo \"\";                                                                \
+        echo \"Rolls back a branch to the specified commit\";                     \
+        echo \"\";                                                                \
+        echo \"Usage: git rollback <commit-id> [<repo>]\";                        \
+        echo \"Example: git rollback 24c51ade98e4f9cce2771b29a9a15973de308e53\";  \
+        echo \"\";                                                                \
+        exit -1;                                                                  \
+      else                                                                        \
+        if [[ -z $2 ]]; then                                                      \
+          r=\"origin\";                                                           \
+        else                                                                      \
+          r=\"$2\";                                                               \
+        fi;                                                                       \
+        if [[ $1 =! ^[lL][aA][sS][tT] ]]; then                                    \
+          git reset --hard HEAD^;                                                 \
+        else                                                                      \
+          read -r -p \"Rolling back to $1. Are you sure? [y|N] \" response;       \
+          if [[ $response =~ ^[yY] ]]; then                                       \
+            git reset --hard $1;                                                  \
+          else                                                                    \
+            echo \"Aborting\";                                                    \
+            exit -1;                                                              \
+          fi;                                                                     \
+        fi;                                                                       \
+        echo \"!! THIS WILL DO A FORCE PUSH TO $r. YOU MUST CONFIRM. !!\";        \
+        read -r -p \"!! Confirm force push !! [y|N] \" ok;                        \
+        if [[ $ok =~ ^[yY] ]]; then                                               \
+          git push $r HEAD --force;                                               \
+        else                                                                      \
+          echo \"Aborting\";                                                      \
+        fi;                                                                       \
+      fi;                                                                         \
     };f"
 
-  # unapplies a stash, e.g., git unapply or git unapply 3
-  # if no stash index is specified, the last stash is 'unapplied'
-  unapply = "!f() {                                                             \
-      if [[ -z $1 ]]; then                                                      \
-        git stash show -p | git apply -R;                                       \
-      else                                                                      \
-        git stash show -p stash@{$1} | git apply -R;                            \
-      fi;                                                                       \
+  # unapplies a stash, if no stash index is specified, the last stash is
+  # 'unapplied'
+  #
+  # Usage: git unapply [<index>]
+  # Example: git unapply
+  #          git unapply 3
+  unapply = "!f() {                                                               \
+      if [[ -z $1 ]]; then                                                        \
+        git stash show -p | git apply -R;                                         \
+      else                                                                        \
+        git stash show -p stash@{$1} | git apply -R;                              \
+      fi;                                                                         \
     };f"
 
-  # applies work previously stashed, e.g. git unstash or git unstash 3
-  # if no stash index is specified, the last stash is applied and dropped
-  unstash = "!f() {                                                             \
-      if [[ -z $1 ]]; then                                                      \
-        git stash apply;                                                        \
-        git stash drop;                                                         \
-      else                                                                      \
-        git stash apply stash@{$1};                                             \
-        git stash drop stash@{$1};                                              \
-      fi;                                                                       \
+  # applies work previously stashed. if no stash index is specified, the last
+  # stash is applied and dropped
+  #
+  # Usage: git unstash [<index>]
+  # Example: git unstash
+  #          git unstash 3
+  unstash = "!f() {                                                               \
+      if [[ -z $1 ]]; then                                                        \
+        git stash apply;                                                          \
+        git stash drop;                                                           \
+      else                                                                        \
+        git stash apply stash@{$1};                                               \
+        git stash drop stash@{$1};                                                \
+      fi;                                                                         \
+    };f"
+
+  # pushes the working branch to the remote
+  #
+  # Usage: git up [<remote>]
+  # Example: git up
+  #          git up origin
+  up = "!f() {                                                                    \
+      bn=\"$(git rev-parse --abbrev-ref HEAD)\";                                  \
+      if [[ -z $bn ]]; then                                                       \
+        echo \"Unable to determine working branch\";                              \
+      else                                                                        \
+        if [[ -z $1 ]]; then                                                      \
+          r=\"origin\";                                                           \
+        else                                                                      \
+          r=\"$1\";                                                               \
+        fi;                                                                       \
+        git push $r $bn;                                                          \
+      fi;                                                                         \
     };f"
 
   # updates a branch to a new upstream
-  update = "!f() {                                                              \
-      if [[ $# -lt 2 ]]; then                                                   \
-        echo \"\";                                                              \
-        echo \"Update a branch to a new upstreamremote.\";                      \
-        echo \"\";                                                              \
-        echo \"Usage: git update <branch> <remote-branch>\";                    \
-        echo \"Example: git update my-branch upstream/next-release-branch\";    \
-        echo \"\";                                                              \
-        exit -1;                                                                \
-      else                                                                      \
-        branch_name=\"\";                                                       \
-        branches=\"$(git branch)\";                                             \
-        branches=(${branches//$'\n'/ });                                        \
-        for branch in \"${branches[@]}\";                                       \
-          do if [[ $branch =~ $1 ]]; then                                       \
-            branch_name=\"$branch\";                                            \
-          fi;                                                                   \
-        done;                                                                   \
-        if [[ -z $branch_name ]]; then                                          \
-          echo \"\";                                                            \
-          echo \"Unable to find a matching branch\";                            \
-          echo \"\";                                                            \
-          exit -1;                                                              \
-        else                                                                    \
-          git branch $branch_name -u $2;                                        \
-          git pull;                                                             \
-        fi;                                                                     \
-      fi;                                                                       \
+  #
+  # Usage: git update <branch> <remote>
+  # Example: git update issue-999 upstream/release-0.1.0
+  update = "!f() {                                                                \
+      if [[ $# -lt 2 ]]; then                                                     \
+        echo \"\";                                                                \
+        echo \"Update a branch to a new upstreamremote.\";                        \
+        echo \"\";                                                                \
+        echo \"Usage: git update <branch> <remote-branch>\";                      \
+        echo \"Example: git update my-branch upstream/next-release-branch\";      \
+        echo \"\";                                                                \
+        exit -1;                                                                  \
+      else                                                                        \
+        branch_name=\"\";                                                         \
+        branches=\"$(git branch)\";                                               \
+        branches=(${branches//$'\n'/ });                                          \
+        for branch in \"${branches[@]}\";                                         \
+          do if [[ $branch =~ $1 ]]; then                                         \
+            branch_name=\"$branch\";                                              \
+          fi;                                                                     \
+        done;                                                                     \
+        if [[ -z $branch_name ]]; then                                            \
+          echo \"\";                                                              \
+          echo \"Unable to find a matching branch\";                              \
+          echo \"\";                                                              \
+          exit -1;                                                                \
+        else                                                                      \
+          git branch $branch_name -u $2;                                          \
+          git pull;                                                               \
+        fi;                                                                       \
+      fi;                                                                         \
     };f"
 
   # switches branches given a partial branch name, includes stashing current work
-  # e.g., git workon 999
-  workon = "!f() {                                                              \
-      if [[ $# -lt 1 ]]; then                                                   \
-        echo \"\";                                                              \
-        echo \"Switches branches\";                                             \
-        echo \"\";                                                              \
-        echo \"Usage: git workon <defect>\";                                    \
-        echo \"Example: git workon Issue-9999\";                                \
-        echo \"\";                                                              \
-        exit -1;                                                                \
-      else                                                                      \
-        branch_name=\"\";                                                       \
-        branches=\"$(git branch)\";                                             \
-        branches=(${branches//$'\n'/ });                                        \
-        for branch in \"${branches[@]}\";                                       \
-          do if [[ $branch =~ $1 ]]; then                                       \
-            branch_name=\"$branch\";                                            \
-          fi;                                                                   \
-        done;                                                                   \
-        if [[ -z $branch_name ]]; then                                          \
-          echo \"\";                                                            \
-          echo \"Unable to find a matching branch.\";                           \
-          echo \"\";                                                            \
-          exit -1;                                                              \
-        else                                                                    \
-          unstaged=\"$(git status | grep 'Changes not staged for commit')\";    \
-          if [[ -n $unstaged ]]; then                                           \
-            echo \"\";                                                          \
-            echo \"Staged changes can be stashed; unstaged changes cannot.\";   \
-            echo \"You have unstaged changes that must be resolved.\";          \
-            echo \"\";                                                          \
-            exit -1;                                                            \
-          fi;                                                                   \
-          do_stash=\"$(git status | grep 'Changes to be committed')\";          \
-          if [[ -n $do_stash ]]; then                                           \
-            git stash save;                                                     \
-            echo \"Changes stashed.\";                                          \
-          fi;                                                                   \
-          git checkout $branch_name;                                            \
-          stashes=\"$(git stash list | grep $branch_name)\";                    \
-          if [[ $stashes =~ stash@\\{([0-9]+)\\} ]]; then                       \
-            stashes=\"${BASH_REMATCH[1]}\";                                     \
-          else                                                                  \
-            stashes=\"\";                                                       \
-          fi;                                                                   \
-          if [[ -n $stashes ]]; then                                            \
-            git unstash $stashes;                                               \
-          fi;                                                                   \
-        fi;                                                                     \
-      fi;                                                                       \
+  #
+  # Usage: git workon <branch>
+  # Example: git workon 999
+  workon = "!f() {                                                                \
+      if [[ $# -lt 1 ]]; then                                                     \
+        echo \"\";                                                                \
+        echo \"Switches branches\";                                               \
+        echo \"\";                                                                \
+        echo \"Usage: git workon <defect>\";                                      \
+        echo \"Example: git workon Issue-9999\";                                  \
+        echo \"\";                                                                \
+        exit -1;                                                                  \
+      else                                                                        \
+        branch_name=\"\";                                                         \
+        branches=\"$(git branch)\";                                               \
+        branches=(${branches//$'\n'/ });                                          \
+        for branch in \"${branches[@]}\";                                         \
+          do if [[ $branch =~ $1 ]]; then                                         \
+            branch_name=\"$branch\";                                              \
+          fi;                                                                     \
+        done;                                                                     \
+        if [[ -z $branch_name ]]; then                                            \
+          echo \"\";                                                              \
+          echo \"Unable to find a matching branch.\";                             \
+          echo \"\";                                                              \
+          exit -1;                                                                \
+        else                                                                      \
+          unstaged=\"$(git status | grep 'Changes not staged for commit')\";      \
+          if [[ -n $unstaged ]]; then                                             \
+            echo \"\";                                                            \
+            echo \"Staged changes can be stashed; unstaged changes cannot.\";     \
+            echo \"You have unstaged changes that must be resolved.\";            \
+            echo \"\";                                                            \
+            exit -1;                                                              \
+          fi;                                                                     \
+          do_stash=\"$(git status | grep 'Changes to be committed')\";            \
+          if [[ -n $do_stash ]]; then                                             \
+            git stash save;                                                       \
+            echo \"Changes stashed.\";                                            \
+          fi;                                                                     \
+          git checkout $branch_name;                                              \
+          stashes=\"$(git stash list | grep $branch_name)\";                      \
+          if [[ $stashes =~ stash@\\{([0-9]+)\\} ]]; then                         \
+            stashes=\"${BASH_REMATCH[1]}\";                                       \
+          else                                                                    \
+            stashes=\"\";                                                         \
+          fi;                                                                     \
+          if [[ -n $stashes ]]; then                                              \
+            git unstash $stashes;                                                 \
+          fi;                                                                     \
+        fi;                                                                       \
+      fi;                                                                         \
     };f"
