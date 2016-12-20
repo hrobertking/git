@@ -183,6 +183,48 @@
       fi;                                                                         \
     };f"
 
+  # identifies files modified in a branch
+  #
+  # Usage: git modified [<branch>] [<parent>]
+  # Example: git modified mybranch branch-parent
+  modified = "!f() {                                                              \
+      if [[ -z $1 ]]; then                                                        \
+        bn=\"$(git branch | grep \\* )\";                                         \
+        bn=\"${bn/* /}\";                                                         \
+      else                                                                        \
+        counter=0;                                                                \
+        bn=\"\";                                                                  \
+        branches=\"$(git branch)\";                                               \
+        branches=\"$(echo $branches|tr -d '\n')\";                                \
+        branches=($branches);                                                     \
+        for branch in \"${branches[@]}\";                                         \
+          do if [[ $branch =~ $1 ]]; then                                         \
+            bn=\"$branch\";                                                       \
+            counter=$((counter + 1));                                             \
+          fi;                                                                     \
+        done;                                                                     \
+        if [[ -z $bn ]]; then                                                     \
+          echo \"\";                                                              \
+          echo \"Error: Unable to find a matching branch\";                       \
+          echo \"\";                                                              \
+          exit -1;                                                                \
+        elif [ $counter -gt 1 ]; then                                             \
+          echo \"\";                                                              \
+          echo \"Error: Multiple branches match '$1'\";                           \
+          echo \"\";                                                              \
+          exit -1;                                                                \
+        fi;                                                                       \
+      fi;                                                                         \
+      if [[ -z $2 ]]; then                                                        \
+        p=\"$(git config --get branch.$bn.merge)\";                               \
+        p=\"${p##*/}\";                                                           \
+      else                                                                        \
+        p=\"$2\";                                                                 \
+      fi;                                                                         \
+      file_list=\"$(git diff --name-only $bn $p)\";                               \
+      echo \"$file_list\";                                                        \
+    };f"
+
   # moves/renames a branch
   #
   # Usage: git mvbranch <from-branch> <to-branch> [<remote>]
